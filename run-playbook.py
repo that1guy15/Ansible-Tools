@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+#Supports Ansible 2.x
+
 import os
 import sys
 from collections import namedtuple
