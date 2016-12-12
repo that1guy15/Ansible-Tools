@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-#Supports Ansible 2.x
+#!/usr/bin/env python2.7
 
 import os
 import sys
@@ -13,9 +11,11 @@ from ansible.executor.playbook_executor import PlaybookExecutor
 
 variable_manager = VariableManager()
 loader = DataLoader()
+inventory_dir = '/opt/netmgmt/inventory'
+playbook_path = '/opt/netmgmt/netmgmt-netstat.yml'
 
-inventory = Inventory(loader=loader, variable_manager=variable_manager,  host_list='/path/to/inventory') #Path to inventory file
-playbook_path = '/path/to/playbook.yml' #Path to playbook
+
+inventory = Inventory(loader=loader, variable_manager=variable_manager,  host_list=inventory_dir)
 
 if not os.path.exists(playbook_path):
     print '[INFO] The playbook does not exist'
