@@ -1,46 +1,141 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python2
+
+# Based on: https://serversforhackers.com/running-ansible-2-programmatically
 
 import os
 import sys
-import argparse
-from collections import namedtuple
 
+from ansible.executor import playbook_executor
+from ansible.inventory import Inventory
 from ansible.parsing.dataloader import DataLoader
 from ansible.vars import VariableManager
-from ansible.inventory import Inventory
-from ansible.executor.playbook_executor import PlaybookExecutor
-from ansible.utils.display import Display
 
-parser = argparse.ArgumentParser(description='Arguments passed to the script.')
-
-parser.add_argument('-d','--device', help='Enter device you want to run playbook aginst.')
-parser.add_argument('-i','--inventory', help='Enter inventory file you want to run playbook aginst.')
-
-args = parser.parse_args()
-device_arg = args.device
-inventory_arg = args.inventory
-
-variable_manager = VariableManager()
-loader = DataLoader()
-device = device_arg
-inventory = inventory_arg
-playbook_path = '/opt/netmgmt/netmgmt-netstat.yml'
+try:
+    from __main__ import display
+except ImportError:
+    from ansible.utils.display import Display
+    display = Display()
 
 
-inventory = Inventory(loader=loader, variable_manager=variable_manager,  host_list=inventory)
+class Options(object):
+    """
+    Options class to replace Ansible OptParser
+    """
+    def __init__(self, **kwargs):
+        props = (
+            'ask_pass', 'ask_sudo_pass', 'ask_su_pass', 'ask_vault_pass',
+            'become_ask_pass', 'become_method', 'become', 'become_user',
+            'check', 'connection', 'diff', 'extra_vars', 'flush_cache',
+            'force_handlers', 'forks', 'inventory', 'listhosts', 'listtags',
+            'listtasks', 'module_path', 'module_paths',
+            'new_vault_password_file', 'one_line', 'output_file',
+            'poll_interval', 'private_key_file', 'python_interpreter',
+            'remote_user', 'scp_extra_args', 'seconds', 'sftp_extra_args',
+            'skip_tags', 'ssh_common_args', 'ssh_extra_args', 'subset', 'sudo',
+            'sudo_user', 'syntax', 'tags', 'timeout', 'tree',
+            'vault_password_files', 'verbosity')
 
-if not os.path.exists(playbook_path):
-    print '[INFO] The playbook does not exist'
-    sys.exit()
+        for property in props:
+            if property in kwargs:
+                setattr(self, property, kwargs[p])
+            else:
+                setattr(self, property, None)
 
-Options = namedtuple('Options', ['listtags', 'listtasks', 'listhosts', 'syntax', 'connection','module_path', 'forks', 'remote_user', 'private_key_file', 'ssh_common_args', 'ssh_extra_args', 'sftp_extra_args', 'scp_extra_args', 'become', 'become_method', 'become_user', 'verbosity', 'check'])
 
-options = Options(listtags=False, listtasks=False, listhosts=False, syntax=False, connection='ssh', module_path=None, forks=100, remote_user='slotlocker', private_key_file=None, ssh_common_args=None, ssh_extra_args=None, sftp_extra_args=None, scp_extra_args=None, become=True, become_method=None, become_user='root', verbosity=None, check=False)
+class Runner(object):
+    def __init__(
+            self, playbook, display, hosts='hosts', options={}, passwords={},
+            vault_pass=None):
 
-variable_manager.extra_vars = {'hosts': 'mywebserver'} # This can accomodate various other command line arguments.`
+        # Set options
+        self.options = Options()
+        for key, value in options.iteritems():
+            setattr(self.options, key, value)
 
-passwords = {}
+        # Set global verbosity
+        self.display = display
+        self.display.verbosity = self.options.verbosity
+        # Executor has its own verbosity setting
+        playbook_executor.verbosity = self.options.verbosity
 
-pbex = PlaybookExecutor(playbooks=[playbook_path], inventory=inventory, variable_manager=variable_manager, loader=loader, options=options, passwords=passwords)
+        # Gets data from YAML/JSON files
+        self.loader = DataLoader()
+        # Set vault password
+        if vault_pass is not None:
+            self.loader.set_vault_password(vault_pass)
+        elif 'VAULT_PASS' in os.environ:
+            self.loader.set_vault_password(os.environ['VAULT_PASS'])
 
-results = pbex.run()
+        # All the variables from all the various places
+        self.variable_manager = VariableManager()
+        if self.options.python_interpreter is not None:
+            self.variable_manager.extra_vars = {
+                'ansible_python_interpreter': self.options.python_interpreter
+            }
+
+        # Set inventory, using most of above objects
+        self.inventory = Inventory(
+            loader=self.loader, variable_manager=self.variable_manager,
+            host_list=hosts)
+
+        if len(self.inventory.list_hosts()) == 0:
+            # Empty inventory
+            self.display.error("Provided hosts list is empty.")
+            sys.exit(1)
+
+        self.inventory.subset(self.options.subset)
+
+        if len(self.inventory.list_hosts()) == 0:
+            # Invalid limit
+            self.display.error("Specified limit does not match any hosts.")
+            sys.exit(1)
+
+        self.variable_manager.set_inventory(self.inventory)
+
+        # Setup playbook executor, but don't run until run() called
+        self.pbex = playbook_executor.PlaybookExecutor(
+            playbooks=[playbook],
+            inventory=self.inventory,
+            variable_manager=self.variable_manager,
+            loader=self.loader,
+            options=self.options,
+            passwords=passwords)
+
+    def run(self):
+        # Run Playbook and get stats
+        self.pbex.run()
+        stats = self.pbex._tqm._stats
+
+        return stats
+
+
+def main():
+    runner = Runner(
+        playbook='netmgmt-netstat.yml',
+        hosts='hosts',
+        display=display,
+        options={
+            'subset': 'all',
+            # 'become': True,
+            # 'become_method': 'sudo',
+            # 'become_user': 'root',
+            # 'private_key_file': '/path/to/the/id_rsa',
+            # 'tags': 'debug',
+            # 'skip_tags': 'debug',
+            'verbosity': 0,
+        },
+        # passwords={
+        #     'become_pass': 'sudo_password',
+        #     'conn_pass': 'ssh_password',
+        # },
+        # vault_pass='vault_password',
+    )
+
+    stats = runner.run()
+
+    # Maybe do something with stats here? If you want!
+
+
+
+if __name__ == '__main__':
+    main()
