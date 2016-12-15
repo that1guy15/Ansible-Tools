@@ -37,16 +37,16 @@ class Options(object):
 
         for property in props:
             if property in kwargs:
-                setattr(self, property, kwargs[p])
+                setattr(self, property, kwargs[property])
             else:
                 setattr(self, property, None)
 
 
 class Runner(object):
     def __init__(
-            self, playbook, display, hosts='hosts', options={}, passwords={},
+            self, playbook, display, hosts='hosts', limit_to=None, options={}, passwords={},
             vault_pass=None):
-
+		
         # Set options
         self.options = Options()
         for key, value in options.iteritems():
@@ -72,12 +72,12 @@ class Runner(object):
             self.variable_manager.extra_vars = {
                 'ansible_python_interpreter': self.options.python_interpreter
             }
-
+		
         # Set inventory, using most of above objects
         self.inventory = Inventory(
             loader=self.loader, variable_manager=self.variable_manager,
             host_list=hosts)
-
+		
         if len(self.inventory.list_hosts()) == 0:
             # Empty inventory
             self.display.error("Provided hosts list is empty.")
@@ -91,7 +91,7 @@ class Runner(object):
             sys.exit(1)
 
         self.variable_manager.set_inventory(self.inventory)
-
+        	
         # Setup playbook executor, but don't run until run() called
         self.pbex = playbook_executor.PlaybookExecutor(
             playbooks=[playbook],
@@ -113,6 +113,7 @@ def main():
     runner = Runner(
         playbook='netmgmt-netstat.yml',
         hosts='hosts',
+		limit_to='spine1',
         display=display,
         options={
             'subset': 'all',
