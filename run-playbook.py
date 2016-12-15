@@ -116,9 +116,9 @@ class Runner(object):
 
 def main():
     runner = Runner(
-        playbook='netmgmt-netstat.yml',
+        playbook='playbook.yml',
         hosts='hosts',
-        limit_to='spine1',
+        limit_to='device', #all, none, Group Name, IP address or resolvable hostname
         display=display,
         options={
             'subset': 'all',
