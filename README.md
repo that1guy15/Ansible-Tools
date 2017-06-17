@@ -14,6 +14,7 @@ Need to define:
     src_hosts = 'hosts'  
     src_playbook = 'playbooks/test.yml'  
     src_limit = 'all'  
+    extra_vars = '"device_name=spine1"'
     
 src_hosts: Inventory file  
 src_playbook: Playbook to run  
@@ -29,12 +30,13 @@ Call the Runner() class:
             display = display,
             options={
                 'subset': 'all',
+                'extra_vars': extra_vars,
                 # 'become': True,
                 # 'become_method': 'sudo',
                 # 'become_user': 'root',
                 # 'private_key_file': '/path/to/the/id_rsa',
-                # 'tags': 'debug',
-                # 'skip_tags': 'debug',
+                 'tags': '',
+                 'skip_tags': '',
                 'verbosity': 0,
             },
             # passwords={
