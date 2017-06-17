@@ -152,7 +152,5 @@ def main():
 
     stats = runner.run()
 
-    # Maybe do something with stats here? If you want!
-
 if __name__ == '__main__':
     main()
