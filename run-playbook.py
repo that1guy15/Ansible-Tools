@@ -1,10 +1,12 @@
-#!/usr/bin/env python2
+#!/opt/delos/venv/bin/python2.7
 
 # Based on: https://serversforhackers.com/running-ansible-2-programmatically
 
 import os
 import sys
-
+import datetime
+import argparse
+from datetime import datetime
 from ansible.executor import playbook_executor
 from ansible.inventory import Inventory
 from ansible.parsing.dataloader import DataLoader
@@ -16,6 +18,17 @@ except ImportError:
     from ansible.utils.display import Display
     display = Display()
 
+parser = argparse.ArgumentParser(description='Arguments passed to the script.')
+parser.add_argument('device', help='all, none, Group Name, IP address or resolvable hostname. Must be in hosts file')
+parser.add_argument('playbook', help='playbook to run')
+args = parser.parse_args()
+
+
+
+timestamp = datetime.now().strftime('%m/%d/%Y %I:%M:%S')
+src_playbook = args.playbook
+src_hosts = 'hosts'
+src_limit = args.device
 
 class Options(object):
     """
@@ -116,9 +129,9 @@ class Runner(object):
 
 def main():
     runner = Runner(
-        playbook='playbook.yml',
-        hosts='hosts',
-        limit_to='device', #all, none, Group Name, IP address or resolvable hostname
+        playbook=src_playbook,
+        hosts=src_hosts,
+        limit_to=src_limit,  #all, none, Group Name, IP address or resolvable hostname. Must be in hosts file
         display=display,
         options={
             'subset': 'all',
@@ -140,8 +153,6 @@ def main():
     stats = runner.run()
 
     # Maybe do something with stats here? If you want!
-
-
 
 if __name__ == '__main__':
     main()
